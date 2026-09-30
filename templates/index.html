@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Expense Tracker</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 500px; margin: 30px auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; }
+        input, button, select { padding: 10px; margin: 5px 0; width: 95%; box-sizing: border-box; }
+        button { background-color: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        ul { list-style-type: none; padding: 0; }
+        li { background: #f4f4f4; margin: 5px 0; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
+        .date-tag { font-size: 0.8em; color: #666; display: block; }
+        .delete-btn { background-color: #dc3545; color: white; border: none; padding: 5px 10px; width: auto; cursor: pointer; border-radius: 3px; margin-left: 10px; }
+        .summary-container { background: #e9ecef; padding: 15px; border-radius: 5px; margin-top: 15px; }
+        .summary-row { display: flex; justify-content: space-between; margin: 5px 0; font-size: 1.05em; }
+    </style>
+</head>
+<body>
+    <h2>Expense Tracker 💰</h2>
+    
+    <input type="text" id="title" placeholder="Expense Name (e.g., Tea/Snacks)">
+    <input type="number" id="amount" placeholder="Amount (in ₹)">
+    <input type="date" id="date">
+    <button onclick="addExpense()">Add Expense</button>
+
+    <h3>Expenses List:</h3>
+    <ul id="expense-list"></ul>
+
+    <!-- Weekly, Monthly & Overall Summary -->
+    <div class="summary-container">
+        <div class="summary-row">
+            <span>📅 This Week Spent:</span>
+            <strong>₹<span id="weekly-total">0</span></strong>
+        </div>
+        <div class="summary-row">
+            <span>🗓️ This Month Spent:</span>
+            <strong>₹<span id="monthly-total">0</span></strong>
+        </div>
+        <hr style="border: 0.5px solid #ccc;">
+        <div class="summary-row">
+            <span>💵 Total Spent:</span>
+            <strong>₹<span id="overall-total">0</span></strong>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('date').valueAsDate = new Date();
+
+        async function fetchExpenses() {
+            let res = await fetch('/api/expenses');
+            let data = await res.json();
+            let list = document.getElementById('expense-list');
+            list.innerHTML = '';
+            
+            let overall = 0;
+            let weekly = 0;
+            let monthly = 0;
+
+            let now = new Date();
+            let currentYear = now.getFullYear();
+            let currentMonth = now.getMonth();
+
+            // Weekly range calculation (Last 7 days)
+            let sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(now.getDate() - 7);
+
+            data.forEach((item, index) => {
+                let itemAmt = Number(item.amount);
+                let itemDate = new Date(item.date);
+
+                overall += itemAmt;
+
+                // Check Monthly
+                if (itemDate.getFullYear() === currentYear && itemDate.getMonth() === currentMonth) {
+                    monthly += itemAmt;
+                }
+
+                // Check Weekly (within last 7 days)
+                if (itemDate >= sevenDaysAgo && itemDate <= now) {
+                    weekly += itemAmt;
+                }
+
+                list.innerHTML += `
+                    <li>
+                        <div>
+                            <strong>${item.title}</strong>
+                            <span class="date-tag">📅 ${item.date}</span>
+                        </div>
+                        <div>
+                            <span style="color: #d9534f; font-weight: bold;">₹${item.amount}</span>
+                            <button class="delete-btn" onclick="deleteExpense(${index})">❌</button>
+                        </div>
+                    </li>`;
+            });
+
+            document.getElementById('overall-total').innerText = overall;
+            document.getElementById('weekly-total').innerText = weekly;
+            document.getElementById('monthly-total').innerText = monthly;
+        }
+
+        async function addExpense() {
+            let title = document.getElementById('title').value;
+            let amount = document.getElementById('amount').value;
+            let date = document.getElementById('date').value;
+
+            if (!title || !amount || !date) {
+                alert('Ellam field-yum fill pannu da!');
+                return;
+            }
+
+            await fetch('/api/expenses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: title, amount: amount, date: date })
+            });
+
+            document.getElementById('title').value = '';
+            document.getElementById('amount').value = '';
+            document.getElementById('date').valueAsDate = new Date();
+            fetchExpenses();
+        }
+
+        async function deleteExpense(index) {
+            await fetch(`/api/expenses/${index}`, {
+                method: 'DELETE'
+            });
+            fetchExpenses();
+        }
+
+        fetchExpenses();
+    </script>
+</body>
+</html>
